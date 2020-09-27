@@ -212,3 +212,222 @@ SCORE_FONT = pygame.font.SysFont("comicsans",50)
 score_label = SCORE_FONT.render("Score: " + str(score),1,(255,255,255))
 window.blit(score_label, (WINDOW_WIDTH - score_label.get_width() - 15, 10))
 ```
+
+
+# Parte de inteligencia artificial
+Para esta parte se usara el algoritmo de NEAT (Para mayor profundidad en el ver en las siguientes fuentes):
+- [Paper de neat](http://nn.cs.utexas.edu/downloads/papers/stanley.cec02.pdf)
+- [Documentacion oficial](https://neat-python.readthedocs.io/en/latest/)
+
+Basicamente el modulo de NEAT nos permite constrir redes neuronales simples, que pueden crecer en complejidad automaticamente, para la solución de nuestros problemas de multiples variables.
+
+## ¿ Que se necesita ?
+- Entradas :  Las entradas son de las partes más importantes ya que de ellas depende el buen dieseño de nuestra red neuronal. Para nuestro Flappy bird que posibles entradas son convenientes:
+    - La posición del pajaro en el eje y.
+    - La distancia entre el pajaro y el tubo de arriba.
+    - La distancia entre el pajaro y el tubo de abajo.
+- Salidas :  Para nuestro pajaro el unico metodo de movimiento el metodo jump. Por lo cual la salida es una unica neurona que nos indica si se llama el metodo jump o no.
+
+- Función de activción:
+
+    ![image](./images/tanh.png)
+    - El uso de estas funciones de activación es para truncar el resultado de una neurona entre 1 y -1 (Algunas famosas son Sigmoid, relu, etc).
+
+- Tamaño de la población: 100 PAJAROS. Este es el número de flappy birds por generación
+
+- Fitness function: Es la parte más importante de nuestra red neuronal ya que esta define como los pajaros se van a hacer mejores. ¿Cómo evaluaremos si un pajaro lo esta haciendo bien?
+    - Que tan lejos en el eje x llega el pajaro.
+
+- Truncar el programa a un número finito de genraciones.
+
+## Programación
+1. Crear el archivo de configuración. La documentación se encuentra [aqui](https://neat-python.readthedocs.io/en/latest/config_file.html).
+```
+[NEAT]
+fitness_criterion     = max
+fitness_threshold     = 100
+pop_size              = 50
+reset_on_extinction   = False
+
+[DefaultGenome]
+# node activation options
+activation_default      = tanh
+activation_mutate_rate  = 0.0
+activation_options      = tanh
+
+# node aggregation options
+aggregation_default     = sum
+aggregation_mutate_rate = 0.0
+aggregation_options     = sum
+
+# node bias options
+bias_init_mean          = 0.0
+bias_init_stdev         = 1.0
+bias_max_value          = 30.0
+bias_min_value          = -30.0
+bias_mutate_power       = 0.5
+bias_mutate_rate        = 0.7
+bias_replace_rate       = 0.1
+
+# genome compatibility options
+compatibility_disjoint_coefficient = 1.0
+compatibility_weight_coefficient   = 0.5
+
+# connection add/remove rates
+conn_add_prob           = 0.5
+conn_delete_prob        = 0.5
+
+# connection enable options
+enabled_default         = True
+enabled_mutate_rate     = 0.01
+
+feed_forward            = True
+initial_connection      = full
+
+# node add/remove rates
+node_add_prob           = 0.2
+node_delete_prob        = 0.2
+
+# network parameters
+num_hidden              = 0
+num_inputs              = 3
+num_outputs             = 1
+
+# node response options
+response_init_mean      = 1.0
+response_init_stdev     = 0.0
+response_max_value      = 30.0
+response_min_value      = -30.0
+response_mutate_power   = 0.0
+response_mutate_rate    = 0.0
+response_replace_rate   = 0.0
+
+# connection weight options
+weight_init_mean        = 0.0
+weight_init_stdev       = 1.0
+weight_max_value        = 30
+weight_min_value        = -30
+weight_mutate_power     = 0.5
+weight_mutate_rate      = 0.8
+weight_replace_rate     = 0.1
+
+[DefaultSpeciesSet]
+compatibility_threshold = 3.0
+
+[DefaultStagnation]
+species_fitness_func = max
+max_stagnation       = 20
+species_elitism      = 2
+
+[DefaultReproduction]
+elitism            = 2
+survival_threshold = 0.2
+```
+
+- Red neuronal:
+    ![image](./images/red_neuronal.jpg)
+
+2. En el archivo flappy_bird.py configurar la ruta al archivo de configuración.
+```PYTHON
+if __name__ == "__main__":
+    local_dir = os.path.dirname(__file__) 
+    config_path = os.path.join(local_dir, 'config-feedforward.txt')
+
+    config = neat.config.Config(neat.Def)
+```
+
+3. Crear una población
+```PYTHON
+if __name__ == "__main__":
+    local_dir = os.path.dirname(__file__) 
+    config_path = os.path.join(local_dir, 'config-feedforward.txt')
+
+    config = neat.config.Config(neat.Def)
+
+    population = neat.Population(config)
+```
+
+4. Agregar algunas estadisticas para ver en pantalla mientras se corren la simulaciones por generación
+```PYTHON
+if __name__ == "__main__":
+    local_dir = os.path.dirname(__file__) 
+    config_path = os.path.join(local_dir, 'config-feedforward.txt')
+
+    config = neat.config.Config(neat.Def)
+
+    population = neat.Population(config)
+
+    population.add_reporter(neat.StdOutReporter(True))
+    population.add_reporter(neat.StatisticsReporter())
+```
+
+5. Correr la funcion que se debe replicar por generación. En nuestro caso el main.
+```PYTHON
+winner = population.run(main, 50) # Se llama al main 50 veces
+```
+
+6. Pasar por parametros al main los genomas y el config
+```PYTHON
+def main(genomes, config):
+    pass
+```
+
+7. Configurar el main para que se corran varias instancias de la clase Bird.
+
+8. Crear las listas para llevar la información de los pajaros, las redes neuronales y el genoma de cada pajaro.
+```PYTHON
+    neural_networks = []
+    ge = []
+    birds = []
+
+    for genome_id, genome in genomes:
+        net = neat.nn.FeedForwardNetwork.create(genome, config)
+        neural_networks.append(net)
+        birds.append(Bird(WINDOW_WIDTH/2 - 20,WINDOW_HEIGHT/2 - 60))
+        genome.fitness = 0
+        ge.append(genome)
+```
+
+9. Completar el condicional para cuando un pajaro choque.
+```PYTHON
+            for x, bird in enumerate(birds):
+                if check_collision(bird, pipe):
+                    ge[x].fitness -= 1
+                    birds.pop(x)
+                    neural_networks.pop(x)
+                    ge.pop(x)
+```
+
+10. Aumentar el fitness de genoma cada vez que el pajaro pase un tubo.
+```PYTHON
+        if add_pipe : 
+            score += 1
+            for g in ge:
+                g.fitness += 5
+            pipes.append(Pipe(WINDOW_WIDTH + 100))
+``` 
+
+11. Eliminar el pajaro y toda su información si este toca el suelo.
+
+12. Determinar que pipe se debe usar en la lista de pipes para la entrada a la red neuronal.
+```PYTHON
+        pipe_ind = 0
+        if len(birds) > 0:
+            if len(pipes) > 1 and birds[0].x > pipes[0].x + pipes[0].PIPE_TOP.get_width():  # determine whether to use the first or second
+                pipe_ind = 1 
+        else:
+            run = False
+            break # Salir del cuble pirncipal
+```
+
+13. Mover el pajaro dependiendo de su red neuronal y aumentar el fitness un poco cada frame para que el pajaro quiera seguir con vida.
+```PYTHON
+        for x , bird in enumerate(birds):
+            bird.move()
+            ge[x].fitness += 0.1
+            # send bird location, top pipe location and bottom pipe location and determine from network whether to jump or not
+            output = neural_networks[x].activate((bird.y, abs(bird.y - pipes[pipe_ind].height), abs(bird.y - pipes[pipe_ind].bottom)))
+
+            if output[0] > 0.5:  # we use a tanh activation function so result will be between -1 and 1. if over 0.5 jump
+                bird.jump()
+```
